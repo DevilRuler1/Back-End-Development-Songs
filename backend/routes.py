@@ -50,3 +50,61 @@ def parse_json(data):
 ######################################################################
 # INSERT CODE HERE
 ######################################################################
+
+@app.route("/health")
+def health():
+    return {"status": "OK"}, 200
+
+@app.route("/count")
+def count():
+    return {"count": len(songs_list)}, 200
+
+@app.route("/song", methods=["GET"])
+def songs():
+    all_songs = db.songs.find({})
+    songs = [song for song in all_songs]
+    return json.dumps({"songs": songs}, default=str), 200
+
+@app.route("/song/<id>", methods=["GET"])
+def get_song_by_id(id):
+    song = db.songs.find_one({"id": int(id)})
+    if song:
+        return json.dumps(song, default=str), 200
+    else:
+        return {"message": "song with id not found"}, 404
+
+@app.route("/song", methods=["POST"])
+def create_song():
+    data = request.json
+
+    for song in songs_list:
+        if song["id"] == data["id"]:
+            return {"Message": "song with id {} already present".format(song['id'])}, 302
+    
+    songs_list.append(data)
+    result = db.songs.insert_one(data)
+    return json.dumps({"inserted id": {"$oid": str(result.inserted_id)}}, default=str), 201
+
+@app.route("/song/<int:id>", methods=["PUT"])
+def update_song(id):
+    data = request.json
+
+    song = db.songs.find_one({"id": id})
+
+    if song:
+        if (song["lyrics"] != data["lyrics"] or song["title"] != data["title"]):
+            result = db.songs.update_one({"id": id}, {"$set": {"lyrics": data["lyrics"], "title": data["title"]}})
+            song = db.songs.find_one({"id": id})
+            return json.dumps(song, default=str), 201
+        else:
+            return {"message":"song found, but nothing updated"}, 200
+    return {"message": "song not found"}, 404
+
+@app.route("/song/<int:id>", methods=["DELETE"])
+def delete_song(id):
+    result = db.song.delete_one({"id": id})
+    if result.deleted_count == 0:
+        return {"message": "song not found"}, 404
+    else:
+        return "", 204
+
